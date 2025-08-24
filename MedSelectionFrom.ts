@@ -20,7 +20,6 @@ import useMARPermissions from 'shared/permissions/useMARPermissions';
 import MRangePicker from 'components/Elements/MRangePicker'
 import MCheckbox from 'components/Elements/MCheckbox'
 import { calculateAge, getSubscriptionPlans, toWordsConvert } from 'shared/hooks/loginTypeFunctions';
-import { debug } from 'console';
 import { useLocation } from 'react-router-dom';
 const { Option } = Select;
 const { TextArea } = Input;
@@ -64,6 +63,8 @@ const daysOptions = [
 interface SplitDoseOption {
     rowKey: number;
     takeValue: string;
+    doseUnitValue: string;
+    doseUnitOtherValue: string;
     takeValueErrorMessage: null | string;
     frequencyCodeValue: string;
     frequencyCodeValueErrorMessage: null | string;
@@ -73,6 +74,7 @@ interface SplitDoseOption {
     frequencyName: string;
     IsActive: boolean;
     SplitDoseID: null | string
+    instructionValue: string;
 }
 
 const options = [
@@ -184,10 +186,13 @@ interface requiredFieldsObjInterface {
 const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = () => { }, setSelectMedicine = () => { },
     isFromGenerateScriptForm = false,
     ...props }) => {
+    const [doseUnit, setDoseUnit] = useState<any>('')
     const [splitDoseArrayOptions, setSplitDoseArrayOptions] = useState<SplitDoseOption[]>([{
         rowKey: 0,
         takeValue: "",
         frequencyCodeValue: "",
+        doseUnitValue: doseUnit,
+        doseUnitOtherValue: "",
         doseRangeValue: "",
         isDoseRangeSelected: false,
         frequencyName: "",
@@ -195,8 +200,19 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         SplitDoseID: null,
         doseRangeValueErrorMessage: null,
         frequencyCodeValueErrorMessage: null,
-        takeValueErrorMessage: null
+        takeValueErrorMessage: null,
+        instructionValue: ""
     }])
+    useEffect(() => {
+        if (doseUnit !== "") {
+            setSplitDoseArrayOptions(splitDoseArrayOptions.map((record: any) => {
+                return {
+                    ...record,
+                    doseUnitValue: doseUnit,
+                }
+            }))
+        }
+    }, [doseUnit])
     const location = useLocation()
     const { isMedicationDetailLoading } = useAppSelector(
         (state: any) => state.GetMedication
@@ -305,13 +321,16 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         takeValue: "",
         frequencyCodeValue: "",
         doseRangeValue: "",
+        doseUnitValue: "",
+        doseUnitOtherValue: "",
         isDoseRangeSelected: false,
         frequencyName: "",
         IsActive: true,
         SplitDoseID: null,
         doseRangeValueErrorMessage: null,
         frequencyCodeValueErrorMessage: null,
-        takeValueErrorMessage: null
+        takeValueErrorMessage: null,
+        instructionValue: ""
     }])
     const { isFromPackSizeDrawer, isFromHistoryPageAddToChart, isGenerateScriptClickedWithoutMed, duplicatedMedicationsArrayOptions }: any = useAppSelector((state) => state.GlobalStateContainer)
     const { sARequestandResponseDataSecond, isSARequestandResponseSecondLoading } = useAppSelector((state: any) => state.SARequestandResponseSecond);
@@ -321,7 +340,6 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
     const [takeMed, setTakeMed] = useState<any>('')
     const [doseMed, setDoseMed] = useState<any>('')
     const [unitMed, setUnitMed] = useState('')
-    const [doseUnit, setDoseUnit] = useState<any>('')
     const [doseUnitOtherValue, setDoseUnitOtherValue] = useState('')
     const [doseUnitOption, setDoseUnitOption] = useState<any>([])
     const [doseRange, setDoseRange] = useState(false)
@@ -1682,6 +1700,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
             setStrengthID(medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.strengthID)
             setStrengthIDMed(medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.strength?.toString())
             const unit = autoSelectDoseUnit(form, medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.isInsulin)
+
             const tempDoseUnitArrayOptions: any[] = [...medicationDetailsAddEditData[0]?.lstMedicineUnitOfMeasure.filter((record: any) => record.uom !== "Other").map((item, index) => {
                 return (
                     {
@@ -2090,7 +2109,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
 
     const setDirectionsFunction = (takeMed, PRNIndicationObject, doseMed, medicationDetailsAddEditData, frequencyMed, durationMed, daysMed, doseRange,
         quantityMed, unitMed, routeMedText, medicationArray, IsBlisterPack, doseUnit, isPRNMedicine
-        , maxDosePer24Hour, maxDosePer24HourUnit, medicineStartDate, medicineEndDate
+        , maxDosePer24Hour, maxDosePer24HourUnit, medicineStartDate, medicineEndDate, otherDoseUnitText = doseUnitOtherValue, isCallingFromSplitDose = false
     ) => {
 
         let tk = takeMed !== null ? takeMed : '';
@@ -2103,7 +2122,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         let unit = doseUnit == "Other" ? doseUnitOtherValue : doseUnit;
         let formSuppVal = formID ? formID.toString() : ''
         let form = '';
-        let sig = '';
+        let sig: any = '';
 
         if (frq.toLowerCase().includes('select')) {
             frq = '';
@@ -2200,12 +2219,25 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                 sig = `${form} ${tk} ${unit} ${frq}`;
             }
         }
+        if (permissions?.SaveSplitDose && !isCallingFromSplitDose) {
+            const array = splitDoseArrayOptions.filter((record: SplitDoseOption) => record.IsActive).map((med) => {
+                return med.instructionValue
+            });
+            sig = array.filter(Boolean).join(' AND ')
+        }
         if (isPRNMedicine) {
             sig = `${sig} when required`;
         }
         if (indicat) {
             sig = `${sig} for ${indicat}`;
         }
+        // if (isPRNMedicine) {
+        //     sig = sig.replaceAll("when required")
+        //     sig = `${sig} when required`;
+        // }
+        // if (indicat) {
+        //     sig = `${sig} for ${indicat}`;
+        // }
         // if (IsBlisterPack) {
         //     if (!sig.includes('please blister pack.')) {
         //         sig = `${sig} please blister pack.`;
@@ -2217,6 +2249,8 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         if (!isDirectionManuallyEntered && !isFreeTextDirections) {
             setDirections(sig);
             setAdminDirections(sig)
+            if (isCallingFromSplitDose)
+                return sig
         }
     };
 
@@ -2859,9 +2893,10 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
     const saveMedicineFun = async (isGenerateScript: boolean, isSaveFromAdministration: any = undefined) => {
         setIsGenerateScriptSaveButtonClicked(isGenerateScript)
         let btnArray = medicationArray?.buttonArray
-        let isSplitDoseEnabled: boolean = ((((props?.selectedMedicine?.isFromMDRInformation == true && allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose == null) ||
-            (allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose)) && permissions?.SaveSplitDose) ||
-            (allMedicationForEdit == null && permissions?.SaveSplitDose))
+        // let isSplitDoseEnabled: boolean = ((((props?.selectedMedicine?.isFromMDRInformation == true && allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose == null) ||
+        //     (allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose)) && permissions?.SaveSplitDose) ||
+        //     (allMedicationForEdit == null && permissions?.SaveSplitDose))
+        let isSplitDoseEnabled: boolean = permissions?.SaveSplitDose === true ? true : false
         const splitDoseArrayOptionsCopy: any[] = isSplitDoseEnabled ? splitDoseArrayOptions : [1]
 
         dispatch(appServices.setReactivatingMedicineFrequency(frequencyMed === "41" ? "Short Term" : isPRNMedicine ? "PRN" : frequencyMed == "8" ? "Stat" : "Regular"))
@@ -2955,6 +2990,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                             DoseRange: isSplit ? (record.doseRangeValue || null) : (doseMed || null),
                             IsDoseRange: isSplit ? record.isDoseRangeSelected : doseRange,
                             frequencyName: frequencyName,
+                            Instruction: isSplit ? record.instructionValue : directions,
                             IsActive: record.IsActive,
                         };
 
@@ -3144,53 +3180,87 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         };
         dispatch(appServices.SARequestandResponseSecond(raw));
     };
+
     useEffect(() => {
 
         if (allMedicationForEdit && allMedicationForEdit?.mdrMedicineData && allMedicationForEdit?.mdrMedicineData.length && !isFromHistoryPageAddToChart) {
+            let IsInsuline = allMedicationForEdit?.lookups[0]?.lstPatientMedication[0]?.isInsulin
+
+            let form = allMedicationForEdit?.lookups[0]?.lstPatientMedication[0]?.form
+
+            const unit = autoSelectDoseUnit(form, IsInsuline)
+
+            let doseUnit: any = ""
+            let doseUnitOther: any = ""
+            if (props?.selectedMedicine?.isFromMDRInformationEdit == true || props?.selectedMedicine?.isFromMDRInformation == true || props.generateScriptSc == true) {
+                if (props?.selectedMedicine?.isFromMDRInformation !== true || props?.selectedMedicine?.isAddedFromApplication == true) {
+                    doseUnit = allMedicationForEdit?.mdrMedicineData[0]?.doseunit
+                    doseUnitOther = allMedicationForEdit?.mdrMedicineData[0]?.doseunit === "Other" ?
+                        allMedicationForEdit?.mdrMedicineData[0]?.OtherDoseUnit !== null &&
+                            allMedicationForEdit?.mdrMedicineData[0]?.OtherDoseUnit !== "" &&
+                            allMedicationForEdit?.mdrMedicineData[0]?.OtherDoseUnit !== undefined ?
+                            allMedicationForEdit?.mdrMedicineData[0]?.OtherDoseUnit : ""
+                        : ""
+                }
+            } else {
+                doseUnit = unit
+            }
             const splitDossesArray: any[] = (allMedicationForEdit?.mdrMedicineData[0]?.SplitDoses !== null && allMedicationForEdit?.mdrMedicineData[0]?.SplitDoses !== undefined && allMedicationForEdit?.mdrMedicineData[0]?.SplitDoses !== "") ?
                 JSON.parse(allMedicationForEdit?.mdrMedicineData[0].SplitDoses) :
                 []
+            if (permissions?.SaveSplitDose && allMedicationForEdit?.mdrMedicineData[0]?.SplitDoses === null && props?.selectedMedicine?.isFromMDRInformation !== true) {
 
-            if (props?.selectedMedicine?.isFromMDRInformation !== true) {
                 setSplitDoseArrayOptions(
-                    [{
-                        Dose: allMedicationForEdit?.mdrMedicineData[0]?.TAKE != 0 ? allMedicationForEdit?.mdrMedicineData[0]?.TAKE : '',
-                        FrequencyID: allMedicationForEdit?.mdrMedicineData[0]?.FREQUENCYCODE?.toString(),
-                        IsDoseRange: allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== undefined &&
-                            allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== "" &&
-                            allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== null ?
-                            allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange : false,
-                        MaxDose: allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== undefined &&
-                            allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== "" &&
-                            allMedicationForEdit?.mdrMedicineData[0]?.DoseRange != 0 &&
-                            allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== null ?
-                            allMedicationForEdit?.mdrMedicineData[0]?.DoseRange.toString() : '',
-                        SplitDoseID: null
-
-                    }, ...splitDossesArray].map((record: any,) => {
+                    [
+                        {
+                            rowKey: Math.floor(Math.random() * 100000),
+                            takeValue: allMedicationForEdit?.mdrMedicineData[0]?.TAKE != 0 ? allMedicationForEdit?.mdrMedicineData[0]?.TAKE : '',
+                            frequencyCodeValue: allMedicationForEdit?.mdrMedicineData[0]?.FREQUENCYCODE?.toString(),
+                            isDoseRangeSelected: allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== undefined &&
+                                allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== "" &&
+                                allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange !== null ?
+                                allMedicationForEdit?.mdrMedicineData[0]?.IsDoseRange : false,
+                            doseRangeValue: allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== undefined &&
+                                allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== "" &&
+                                allMedicationForEdit?.mdrMedicineData[0]?.DoseRange != 0 &&
+                                allMedicationForEdit?.mdrMedicineData[0]?.DoseRange !== null ?
+                                allMedicationForEdit?.mdrMedicineData[0]?.DoseRange.toString() : '',
+                            SplitDoseID: null,
+                            frequencyName: "",
+                            IsActive: true,
+                            doseRangeValueErrorMessage: null,
+                            frequencyCodeValueErrorMessage: null,
+                            takeValueErrorMessage: null,
+                            instructionValue: allMedicationForEdit?.mdrMedicineData[0]?.DIRECTIONS,
+                            doseUnitValue: doseUnit,
+                            doseUnitOtherValue: doseUnitOther,
+                        },
+                    ])
+            } else if (permissions?.SaveSplitDose && allMedicationForEdit?.mdrMedicineData[0]?.SplitDoses !== null && props?.selectedMedicine?.isFromMDRInformation !== true) {
+                setSplitDoseArrayOptions(
+                    splitDossesArray.map((record: any,) => {
                         return {
                             rowKey: Math.floor(Math.random() * 100000),
                             takeValue: record.Dose,
-                            doseUnitValue: "",
                             frequencyCodeValue: record?.FrequencyID?.toString(),
                             doseRangeValue: record.MaxDose,
                             isDoseRangeSelected: record.IsDoseRange,
                             frequencyName: "",
-                            doseUnitOtherValue: "",
                             IsActive: true,
                             SplitDoseID: record.SplitDoseID,
                             doseRangeValueErrorMessage: null,
                             frequencyCodeValueErrorMessage: null,
-                            takeValueErrorMessage: null
+                            takeValueErrorMessage: null,
+                            instructionValue: record.Instruction,
+                            doseUnitValue: doseUnit,
+                            doseUnitOtherValue: doseUnitOther,
                         }
                     }))
             }
             setIsBlisterPack(allMedicationForEdit?.mdrMedicineData[0].IsBlisterPack)
             setIsLongTerm(allMedicationForEdit?.mdrMedicineData[0].IsLongTerm)
             setchatToPharmacist(allMedicationForEdit?.mdrMedicineData[0].PrivatePharmacistsOnly)
-            let form = allMedicationForEdit?.lookups[0]?.lstPatientMedication[0]?.form
             let formID = allMedicationForEdit?.lookups[0]?.lstPatientMedication[0]?.formID.toString()
-            let IsInsuline = allMedicationForEdit?.lookups[0]?.lstPatientMedication[0]?.isInsulin
             setSelectedMed(allMedicationForEdit?.lookups[0]?.lstPatientMedication[0])
             // const label = autoSelectTakeLabel(form, formID)
             // setTakeLabel(label)
@@ -3200,21 +3270,42 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                 allMedicationForEdit?.mdrMedicineData[0]?.IsFreeTextDirections !== undefined ?
                 allMedicationForEdit?.mdrMedicineData[0]?.IsFreeTextDirections : false
             )
-            setMedicineStartDate(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
-                allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
-                props?.selectedMedicine?.isFromReactivationMedicine !== true &&
-                allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
-                dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : dayjs())
-            // setdateFrom(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+            if (props.selectedMedicine?.isFromMDRInformation === true) {
+                setMedicineStartDate(null);
+            } else {
+                setMedicineStartDate(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+                    allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
+                    props?.selectedMedicine?.isFromReactivationMedicine !== true &&
+                    allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
+                    dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : null)
+
+                // setdateFrom(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+                //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
+                //     props?.selectedMedicine.isFromReactivationMedicine !== true &&
+                //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
+                //     dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : dayjs())
+                setMedicineStartTime(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+                    allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
+                    props?.selectedMedicine.isFromReactivationMedicine !== true &&
+                    allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
+                    dayjs(new Date(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime)) : null)
+            }
+
+            // setMedicineStartDate(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+            //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
+            //     props?.selectedMedicine?.isFromReactivationMedicine !== true &&
+            //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
+            //     dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : null)
+            // // setdateFrom(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
+            // //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
+            // //     props?.selectedMedicine.isFromReactivationMedicine !== true &&
+            // //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
+            // //     dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : dayjs())
+            // setMedicineStartTime(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
             //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
             //     props?.selectedMedicine.isFromReactivationMedicine !== true &&
             //     allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
-            //     dayjs(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime) : dayjs())
-            setMedicineStartTime(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== null &&
-                allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== "" &&
-                props?.selectedMedicine.isFromReactivationMedicine !== true &&
-                allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime !== undefined ?
-                dayjs(new Date(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime)) : dayjs())
+            //     dayjs(new Date(allMedicationForEdit?.mdrMedicineData[0]?.MedStartDateTime)) : null)
             setMedicineEndDate(allMedicationForEdit?.mdrMedicineData[0]?.MedEndDateTime !== null &&
                 allMedicationForEdit?.mdrMedicineData[0]?.MedEndDateTime !== "" &&
                 props?.selectedMedicine.isFromReactivationMedicine !== true &&
@@ -3241,8 +3332,8 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                         allMedicationForEdit?.mdrMedicineData[0]?.MedEndDateTime !== "" &&
                         props?.selectedMedicine.isFromReactivationMedicine !== true &&
                         allMedicationForEdit?.mdrMedicineData[0]?.MedEndDateTime !== undefined ?
-                        (allMedicationForEdit?.mdrMedicineData[0]?.AdditionalDirections || "").replace(/Stop:\s*\d{2}\/\d{2}\/\d{4}/, ``) :
-                        allMedicationForEdit?.mdrMedicineData[0]?.AdditionalDirections
+                        (allMedicationForEdit?.mdrMedicineData[0]?.AdditionalDirection || "").replace(/Stop:\s*\d{2}\/\d{2}\/\d{4}/, ``) :
+                        allMedicationForEdit?.mdrMedicineData[0]?.AdditionalDirection
                 )
                 setAdminDirections(isFromHistoryPageAddToChart ? "" : allMedicationForEdit?.mdrMedicineData[0]?.DIRECTIONS)
                 setAdditionalAdminDirections(allMedicationForEdit?.mdrMedicineData[0]?.AdditionalDirection)
@@ -3385,7 +3476,6 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
             setSaApprovalNumberMed(allMedicationForEdit?.mdrMedicineData[0]?.SAAPROVALNUMBER)
             // setStrengthIDMed(allMedicationForEdit?.mdrMedicineData[0]?.STRENGHTID)
             setReapets(allMedicationForEdit?.mdrMedicineData[0]?.ISREPEAT != 0 ? allMedicationForEdit?.mdrMedicineData[0]?.ISREPEAT : '')
-            const unit = autoSelectDoseUnit(form, IsInsuline)
             if (props?.selectedMedicine?.isFromMDRInformationEdit == true || props?.selectedMedicine?.isFromMDRInformation == true || props.generateScriptSc == true) {
 
                 if (props?.selectedMedicine?.isFromMDRInformation !== true || props?.selectedMedicine?.isAddedFromApplication == true) {
@@ -4086,106 +4176,6 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
 
     // MedSelectionForm changes before Split Dose 
 
-    const setSplitDoseDirectionsFunction = (takeMed, isDoseRangeSelected, doseRangeValue, frequencyMed, doseUnit, OtherDoseUnit) => {
-
-        let tk = takeMed !== null ? takeMed : '';
-        let frq = frequencyMed;
-        frq = GetFrequencyDescription(frq)
-        let frm = medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.form ?? ""
-        let formID = medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.formID
-        let isInsulin = medicationDetailsAddEditData[0]?.lstPatientMedication[0]?.isInsulin
-
-        let unit = doseUnit === "Other" ? OtherDoseUnit : doseUnit;
-        let formSuppVal = formID ? formID.toString() : ''
-        let form = '';
-        let sig = '';
-
-        if (frq.toLowerCase().includes('select')) {
-            frq = '';
-        }
-
-        if (formSuppVal === '26' || formSuppVal === '35' || formSuppVal === '49' || formSuppVal === '267' || formSuppVal === '74') {
-            form = 'Insert';
-        } else {
-            form = takeLabel.replaceAll(":", "");
-        }
-
-        if (tk.includes('.')) {
-            if (!form.toLowerCase().includes('inject')) {
-                tk = tk.replace(/^0+|0+$/g, '');
-                const [preceedingDigit, proceedingDigit] = tk.split('.');
-                if (preceedingDigit === '' && proceedingDigit !== '5' && proceedingDigit !== '50') {
-                    tk = '0.' + proceedingDigit;
-                }
-                if (proceedingDigit === '0' && preceedingDigit !== '') {
-                    tk = preceedingDigit;
-                }
-                if (isDoseRangeSelected) {
-                    if (takeMed && doseRangeValue) {
-                        tk = `${takeMed} to ${doseRangeValue}`;
-                    }
-                }
-                tk = `${takeMed}`
-            } else {
-                if (isDoseRangeSelected) {
-                    if (takeMed && doseRangeValue) {
-                        tk = `${takeMed} to ${doseRangeValue}`;
-                    }
-                }
-            }
-        } else {
-            if (isDoseRangeSelected) {
-                if (takeMed && doseRangeValue) {
-                    tk = `${takeMed} to ${doseRangeValue}`;
-                }
-            }
-        }
-        if (frm.toLowerCase().includes('tablet')) {
-            frm = 'tablet';
-        } else if (frm.toLowerCase().includes('inhal') || frm.toLowerCase().includes('spray')) {
-            frm = 'puff';
-        } else if (frm.toLowerCase().includes('suppositor')) {
-            frm = 'supp(s)';
-        } else if (frm.toLowerCase().includes('oral')) {
-            frm = '';
-        } else if (frm.toLowerCase().includes('liquid')) {
-            frm = 'mL';
-        } else if (frm.toLowerCase().includes('inject')) {
-            frm = isInsulin ? 'Unit' : '';
-        } else if (frm.toLowerCase().includes('capsule')) {
-            frm = 'capsule';
-        } else if (frm.toLowerCase().includes('powder')) {
-            frm = 'g';
-        } else if (frm.toLowerCase().includes('test: strip')) {
-            frm = 'OP';
-        } else {
-            frm = '';
-        }
-        if (parseFloat(takeMed) > 1 && frm) {
-            frm = `${frm}s`;
-        }
-        if (tk.length > 0) {
-            if (!frm.toLowerCase().includes('ampoule')) {
-                tk = toWordsConvert(tk);
-            }
-        }
-        if (unit == "") {
-            unit = ""
-        } else {
-            unit = unit + '';
-        }
-        if (formSuppVal === "99") {
-            sig = `${form} ${tk} ${unit} into each nostril ${frq}`;
-        } else {
-            sig = `${form} ${tk} ${unit} ${frq}`;
-        }
-        // if (medicineTitrationManualObj.startDate !== null && medicineTitrationManualObj.duration && sig.trim() !== "") {
-        //     sig = `${sig} Start: ${dayjs(medicineTitrationManualObj.startDate).format("DD/MM/YYYY")},  Stop: ${dayjs(medicineTitrationManualObj.startDate).add(parseInt(medicineTitrationManualObj.duration), medicineTitrationManualObj.days == "1" ? "days" : medicineTitrationManualObj.days == "2" ? "weeks" : "months").format("DD/MM/YYYY")} `;
-        // } else if (medicineTitrationManualObj.startDate !== null && sig.trim() !== "") {
-        //     sig = `${sig} Start: ${dayjs(medicineTitrationManualObj.startDate).format("DD/MM/YYYY")}`;
-        // }
-        return sig
-    };
     const onChangeSplitDoseFields = (value: any, selectedRowKey: number, type: number) => {
         // type === 1 for take
         // type === 2 for dose range
@@ -4193,37 +4183,123 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
         // type === 4 for dose unit drop down
         // type === 5 for Other field input
         // type === 6 for frequency field
-        let splitDoseArrayOptionsCopy: SplitDoseOption[] = [...splitDoseArrayOptions]
-        let findSplitDoseIndex: number = splitDoseArrayOptionsCopy.findIndex((record: SplitDoseOption) => record.rowKey === selectedRowKey)
-        if (findSplitDoseIndex > -1) {
-            const selectedSplitDoseRecord: SplitDoseOption = splitDoseArrayOptionsCopy[findSplitDoseIndex]
-            if (type === 1) {
-                selectedSplitDoseRecord.takeValue = value
-                selectedSplitDoseRecord.takeValueErrorMessage = parseFloat(value) === 0 ?
-                    "Dose cannot be zero." :
-                    parseFloat(value) >= parseFloat(selectedSplitDoseRecord.doseRangeValue) && selectedSplitDoseRecord.isDoseRangeSelected ?
-                        `The dose must be less than the dose range` : null
+        let splitDoseArrayOptionsCopy: SplitDoseOption[] = [...splitDoseArrayOptions];
 
-            }
-            else if (type === 2) {
-                selectedSplitDoseRecord.doseRangeValue = value
-                selectedSplitDoseRecord.doseRangeValueErrorMessage = parseFloat(value) === 0 ? "Dose range cannot be zero." :
-                    parseFloat(value) <= parseFloat(selectedSplitDoseRecord.takeValue) && selectedSplitDoseRecord.isDoseRangeSelected ? `The dose range must be greater than the ${takeLabel.replace(":", "")}.` : null
-            }
-            else if (type === 3) {
-                selectedSplitDoseRecord.isDoseRangeSelected = value
-                if (value === false) {
-                    selectedSplitDoseRecord.doseRangeValue = ""
-                    selectedSplitDoseRecord.doseRangeValueErrorMessage = null
+        const findSplitDoseIndex: number = splitDoseArrayOptionsCopy.findIndex(
+            (record: SplitDoseOption) => record.rowKey === selectedRowKey
+        );
+
+        if (findSplitDoseIndex > -1) {
+            if (type === 4 || type === 5) {
+                splitDoseArrayOptionsCopy.forEach(record => {
+                    if (type === 4) {
+                        record.doseUnitValue = value;
+                    } else if (type === 5) {
+                        record.doseUnitOtherValue = value;
+                    }
+                    record.instructionValue = (setDirectionsFunction(
+                        record.takeValue ?? "",
+                        PRNIndicationObject.label,
+                        record.doseRangeValue,
+                        medicationDetailsAddEditData,
+                        record.frequencyCodeValue,
+                        durationMed,
+                        daysMed,
+                        record.isDoseRangeSelected,
+                        quantityMed,
+                        unitMed,
+                        routeMedText,
+                        medicationArray?.frequencyArray,
+                        IsBlisterPack,
+                        record.doseUnitValue,
+                        isPRNMedicine,
+                        maxDosePer24Hour,
+                        maxDosePer24HourUnit,
+                        medicineStartDate,
+                        medicineEndDate,
+                        record.doseUnitOtherValue,
+                        true
+                    ) || "");
+                });
+            } else {
+                const selectedSplitDoseRecord = splitDoseArrayOptionsCopy[findSplitDoseIndex];
+
+                switch (type) {
+                    case 1:
+                        selectedSplitDoseRecord.takeValue = value;
+
+                        const takeValueFloat = parseFloat(value);
+                        const doseRangeFloat = parseFloat(selectedSplitDoseRecord.doseRangeValue);
+
+                        selectedSplitDoseRecord.takeValueErrorMessage =
+                            takeValueFloat === 0
+                                ? "Dose cannot be zero."
+                                : selectedSplitDoseRecord.isDoseRangeSelected && takeValueFloat >= doseRangeFloat
+                                    ? "The dose must be less than the dose range"
+                                    : null;
+                        break;
+
+                    case 2:
+                        selectedSplitDoseRecord.doseRangeValue = value;
+
+                        const newDoseRangeFloat = parseFloat(value);
+                        const currentTakeFloat = parseFloat(selectedSplitDoseRecord.takeValue);
+
+                        selectedSplitDoseRecord.doseRangeValueErrorMessage =
+                            newDoseRangeFloat === 0
+                                ? "Dose range cannot be zero."
+                                : selectedSplitDoseRecord.isDoseRangeSelected && newDoseRangeFloat <= currentTakeFloat
+                                    ? `The dose range must be greater than the ${takeLabel.replace(":", "")}.`
+                                    : null;
+                        break;
+
+                    case 3:
+                        selectedSplitDoseRecord.isDoseRangeSelected = value;
+
+                        if (value === false) {
+                            selectedSplitDoseRecord.doseRangeValue = "";
+                            selectedSplitDoseRecord.doseRangeValueErrorMessage = null;
+                        }
+                        break;
+
+                    case 6:
+                        selectedSplitDoseRecord.frequencyCodeValue = value;
+                        selectedSplitDoseRecord.frequencyCodeValueErrorMessage = null;
+                        break;
+
+                    default:
+                        break;
                 }
-            }
-            else if (type === 6) {
-                selectedSplitDoseRecord.frequencyCodeValue = value
-                selectedSplitDoseRecord.frequencyCodeValueErrorMessage = null
+
+                selectedSplitDoseRecord.instructionValue = (setDirectionsFunction(
+                    selectedSplitDoseRecord.takeValue ?? "",
+                    PRNIndicationObject.label,
+                    selectedSplitDoseRecord.doseRangeValue,
+                    medicationDetailsAddEditData,
+                    selectedSplitDoseRecord.frequencyCodeValue,
+                    durationMed,
+                    daysMed,
+                    selectedSplitDoseRecord.isDoseRangeSelected,
+                    quantityMed,
+                    unitMed,
+                    routeMedText,
+                    medicationArray?.frequencyArray,
+                    IsBlisterPack,
+                    selectedSplitDoseRecord.doseUnitValue,
+                    isPRNMedicine,
+                    maxDosePer24Hour,
+                    maxDosePer24HourUnit,
+                    medicineStartDate,
+                    medicineEndDate,
+                    selectedSplitDoseRecord.doseUnitOtherValue,
+                    true
+                ) || "");
             }
         }
+
+
         const array = splitDoseArrayOptionsCopy.filter((record: SplitDoseOption) => record.IsActive).map((med) => {
-            return setSplitDoseDirectionsFunction(med?.takeValue !== undefined ? med?.takeValue : "", med.isDoseRangeSelected, med.doseRangeValue, med.frequencyCodeValue, doseUnit, doseUnitOtherValue)
+            return med.instructionValue
         });
         let sig = array.filter(Boolean).join(' AND ')
         setDirections(sig)
@@ -4244,7 +4320,10 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                 SplitDoseID: null,
                 doseRangeValueErrorMessage: null,
                 frequencyCodeValueErrorMessage: null,
-                takeValueErrorMessage: null
+                takeValueErrorMessage: null,
+                instructionValue: "",
+                doseUnitValue: doseUnit,
+                doseUnitOtherValue: "",
             }
         ]);
     }
@@ -4260,7 +4339,9 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
             splitDoseArrayOptionsCopy = splitDoseArrayOptionsCopy.filter((record: SplitDoseOption) => record.rowKey !== deleteRowKey)
         }
         const array = splitDoseArrayOptionsCopy.filter((record: SplitDoseOption) => record.IsActive).map((med) => {
-            return setSplitDoseDirectionsFunction(med?.takeValue !== undefined ? med?.takeValue : "", med.isDoseRangeSelected, med.doseRangeValue, med.frequencyCodeValue, doseUnit, doseUnitOtherValue)
+            return (setDirectionsFunction(med.takeValue ?? "", PRNIndicationObject.label, med.doseRangeValue, medicationDetailsAddEditData, med.frequencyCodeValue, durationMed, daysMed, med.isDoseRangeSelected, quantityMed, unitMed, routeMedText, medicationArray?.frequencyArray, IsBlisterPack, doseUnit, isPRNMedicine,
+                maxDosePer24Hour, maxDosePer24HourUnit, medicineStartDate, medicineEndDate, "", true
+            ) || "")
         });
         let sig = array.filter(Boolean).join(' AND ')
         setDirections(sig)
@@ -4408,15 +4489,12 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
 
                         <div className="d-flex px-3 pt-3 gap-1 ">
                             {
-                                (
-                                    (((props?.selectedMedicine?.isFromMDRInformation == true && allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose == null) ||
-                                        (allMedicationForEdit?.mdrMedicineData?.[0]?.IsSplitDose)) && permissions?.SaveSplitDose) ||
-                                    (allMedicationForEdit == null && permissions?.SaveSplitDose))
+                                (permissions?.SaveSplitDose)
                                     ?
                                     (<div className='d-flex flex-column'>
                                         {splitDoseArrayOptions.filter((record: SplitDoseOption) => record.IsActive).map((record: SplitDoseOption, index: number) => {
                                             return (
-                                                <div className='d-flex flex-row'>
+                                                <div className='d-flex flex-row mb-3'>
                                                     <MInputNumber
                                                         isRequired={requiredFieldsObj.isTakeRequired}
                                                         label={takeLabel ? takeLabel : 'Loading...'}
@@ -4550,13 +4628,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                                                         disabled={requiredFieldsObj.isDoseUnitDisabled || isFreeTextDirections}
                                                         options={doseUnitOption || []}
                                                         onChange={(e) => {
-                                                            if (permissions?.SaveSplitDose !== true) {
-                                                                setDirectionsFunction(takeMed, PRNIndicationObject.label, doseMed, medicationDetailsAddEditData, frequencyMed, durationMed,
-                                                                    daysMed, doseRange, quantityMed, unitMed, routeMedText, medicationArray?.frequencyArray, IsBlisterPack, e === "Other" ? "" : e,
-                                                                    isPRNMedicine, maxDosePer24Hour, e === "Other" ? "" : e
-                                                                    , medicineStartDate, medicineEndDate
-                                                                )
-                                                            }
+                                                            onChangeSplitDoseFields(e, record.rowKey, 4)
                                                             setErrorMessages({
                                                                 ...errorMessages,
                                                                 doseunitError: null
@@ -4591,13 +4663,8 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                                                             onChange={(e) => {
                                                                 const input = e.target.value;
                                                                 const alphabeticOnly = input.replace(/[^a-zA-Z]/g, '');
-
+                                                                onChangeSplitDoseFields(alphabeticOnly, record.rowKey, 4)
                                                                 setDoseUnitOtherValue(alphabeticOnly)
-                                                                setDirectionsFunction(takeMed, PRNIndicationObject.label, doseMed, medicationDetailsAddEditData,
-                                                                    frequencyMed, durationMed, daysMed, doseRange, quantityMed, unitMed, routeMedText, medicationArray?.frequencyArray,
-                                                                    IsBlisterPack, alphabeticOnly, isPRNMedicine, maxDosePer24Hour, alphabeticOnly
-                                                                    , medicineStartDate, medicineEndDate
-                                                                )
                                                                 setErrorMessages({ ...errorMessages, doseUnitOtherValueError: null })
                                                             }}
                                                             errorMessageDisplay={errorMessages?.doseUnitOtherValueError != null && (
@@ -4653,12 +4720,12 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                                                         )}
                                                     />
                                                     {splitDoseArrayOptions.filter((record: SplitDoseOption) => record.IsActive).length > 1 && (<MButton
-                                                        className={`margin-top-19 me-1 mb-3 btn-danger`}
+                                                        className={`margin-top-19 me-1 btn-danger`}
                                                         onClick={() => onHandleDeleteSplitDoseRow(record.rowKey)}
                                                         children='Delete' />)}
                                                     {index === splitDoseArrayOptions.filter((record: SplitDoseOption) => record.IsActive).length - 1 && (
                                                         <MButton
-                                                            className={`margin-top-19 mb-3 ${requiredFieldsObj.isTakeDisabled ? "disabled" : "theme-button"}`}
+                                                            className={`margin-top-19 ${requiredFieldsObj.isTakeDisabled ? "disabled" : "theme-button"}`}
                                                             onClick={addNewSplitDoseRecord}
                                                             disabled={requiredFieldsObj.isTakeDisabled}
                                                         >
@@ -4672,7 +4739,7 @@ const MedSelectionForm: React.FC<MedSelectionFormProps> = ({ setstopMedRecord = 
                                     </div>) :
                                     (
                                         <>
-                                            <div className="d-flex gap-1 flex-fill">
+                                            <div className="d-flex gap-1 flex-fill mb-3">
                                                 <MInputNumber
                                                     isRequired={requiredFieldsObj.isTakeRequired}
                                                     label={takeLabel ? takeLabel : 'Loading...'}
